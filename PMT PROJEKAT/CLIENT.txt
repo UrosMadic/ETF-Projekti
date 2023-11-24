@@ -1,0 +1,223 @@
+import tkinter as tk
+import numpy as np
+from socket import *
+
+# Postavljanje table za igru
+board= [[0 for _ in range(7)] for _ in range(6)]
+for i in range(6):
+    for j in range(7):
+        board[i][j]=0
+PLAYER_ONE = 1
+PLAYER_TWO = 2
+current_player = PLAYER_ONE
+trcol=0
+trrow=0
+
+def make_move(col):
+    global current_player
+    global trrow
+    global trcol
+
+    # Popunjavanje od najnizih prvo
+    for row in range(5, -1, -1):
+        if board[row][col] == 0:
+            board[row][col] = current_player
+            trcol=col
+            trrow=row
+            return True
+
+    # Za kolonu koja je puna
+    return False
+
+
+def check_win(player):
+    # Horizontalna provera
+    for row in range(6):
+        for col in range(4):
+            if board[row][col] == player and \
+                    board[row][col + 1] == player and \
+                    board[row][col + 2] == player and \
+                    board[row][col + 3] == player:
+                return True
+
+    # Uspravna provera
+    for row in range(3):
+        for col in range(7):
+            if board[row][col] == player and \
+                    board[row + 1][col] == player and \
+                    board[row + 2][col] == player and \
+                    board[row + 3][col] == player:
+                return True
+
+    # Dijagonalna provera na desno
+    for row in range(3):
+        for col in range(4):
+            if board[row][col] == player and \
+                    board[row + 1][col + 1] == player and \
+                    board[row + 2][col + 2] == player and \
+                    board[row + 3][col + 3] == player:
+                return True
+
+    # Dijagonalna provera na levo
+    for row in range(3):
+        for col in range(3, 7):
+            if board[row][col] == player and \
+                    board[row + 1][col - 1] == player and \
+                    board[row + 2][col - 2] == player and \
+                    board[row + 3][col - 3] == player:
+                return True
+
+    #Niko jos nije pobedio
+    return False
+
+
+def drop_piece(col,label):
+    global current_player
+    global serverName
+    global serverPort
+
+    if make_move(col):
+        #Proveri dal je pobedio neko
+        if check_win(current_player):
+            label.config(text="Ti si pobedio!",font=("Arial",30))
+    else:
+        label.config(text="Ova kolona je popunjena. Izaberi drugu kolonu.")
+
+    # Oboji tablu
+    for row in range(6):
+        for col in range(7):
+            color = "white"
+            if board[row][col] == PLAYER_ONE:
+                color = "red"
+            elif board[row][col] == PLAYER_TWO:
+                color = "yellow"
+            canvas.itemconfig(cells[row+1][col], fill=color)
+   
+    button1["state"]="disabled"
+    button2["state"] = "disabled"
+    button3["state"] = "disabled"
+    button4["state"] = "disabled"
+    button5["state"] = "disabled"
+    button6["state"] = "disabled"
+    button7["state"] = "disabled"
+    button8["state"] = "normal"
+           
+     
+
+
+                 
+def send():
+    a=chr(trrow)
+    b=chr(trcol)
+    c=a+b
+    clientSocket.sendto(c.encode(), (serverName, serverPort))
+    button8["state"]="disabled"
+    button9["state"]="normal"
+    label.config(text="Protivnik je na potezu!", font=("Arial", 30))
+    if check_win(PLAYER_ONE):
+    	label.config(text="Ti si pobedio!", font=("Arial", 30))
+    	button9["state"]="disabled"
+    	clientSocket.close()
+  
+   
+def receive():
+    global trrow
+    global trcol
+    message, serverAddress = clientSocket.recvfrom(2048)
+    receivedMessage=message.decode()
+    newrow=ord(receivedMessage[0])
+    newcol=ord(receivedMessage[1])
+    board[newrow][newcol]=PLAYER_TWO
+    for row in range(6):
+        for col in range(7):
+            color = "white"
+            if board[row][col] == PLAYER_ONE:
+                color = "red"
+            elif board[row][col] == PLAYER_TWO:
+                color = "yellow"
+            canvas.itemconfig(cells[row+1][col], fill=color)
+    if check_win(PLAYER_TWO):
+        label.config(text="Protivnik je pobedio!",font=("Arial",30))
+        button9["state"] = "disabled"
+        button8["state"] = "disabled"
+        button1["state"] = "disabled"
+        button2["state"] = "disabled"
+        button3["state"] = "disabled"
+        button4["state"] = "disabled"
+        button5["state"] = "disabled"
+        button6["state"] = "disabled"
+        button7["state"] = "disabled"
+        clientSocket.close()
+    else:
+        button9["state"] = "disabled"
+        button1["state"] = "normal"
+        button2["state"] = "normal"
+        button3["state"] = "normal"
+        button4["state"] = "normal"
+        button5["state"] = "normal"
+        button6["state"] = "normal"
+        button7["state"] = "normal"
+        label.config(text="Ti si na potezu",font=("Arial",30))
+       
+   
+
+# Namestanje glavnog prozora
+root = tk.Tk()
+root.title("Povezi 4")
+# root.attributes("-fullscreen",True)
+root.geometry("1920x1080")
+
+label = tk.Label(root, text="")
+
+button8=tk.Button(root,text="Pošalji korak",height=4,width=40,command=send,state="disabled")
+button8.pack(side="left")
+button9=tk.Button(root,text="Primi korak",height=4,width=40,command=receive,state="disabled")
+button9.pack(side="right")
+
+
+# Postavljanje canvasa za tabelu
+canvas = tk.Canvas(root, width=700, height=700)
+canvas.pack()
+label.pack()
+
+cells = []
+
+for row in range(7):
+
+    cell_row = []
+    for col in range(7):
+        if row==0 and col==0:
+            button1=tk.Button(canvas,text="1 Kolona",command=lambda: drop_piece(0,label))
+            button1.place(x=col*100+20,y=row*100+65)
+        elif row==0 and col==1:
+            button2=tk.Button(canvas,text="2 Kolona",command=lambda: drop_piece(1,label))
+            button2.place(x=col*100+20,y=row*100+65)
+        elif row==0 and col==2:
+            button3=tk.Button(canvas,text="3 Kolona",command=lambda: drop_piece(2,label))
+            button3.place(x=col*100+20,y=row*100+65)
+        elif row==0 and col==3:
+            button4=tk.Button(canvas,text="4 Kolona",command=lambda: drop_piece(3,label))
+            button4.place(x=col*100+20,y=row*100+65)
+        elif row == 0 and col == 4:
+            button5 = tk.Button(canvas, text="5 Kolona", command=lambda: drop_piece(4, label))
+            button5.place(x=col * 100 + 20, y=row * 100 + 65)
+        elif row==0 and col==5:
+            button6=tk.Button(canvas,text="6 Kolona",command=lambda: drop_piece(5,label))
+            button6.place(x=col*100+20,y=row*100+65)
+        elif row==0 and col==6:
+            button7=tk.Button(canvas,text="7 Kolona",command=lambda: drop_piece(6,label))
+            button7.place(x=col*100+20,y=row*100+65)
+        elif row == 0 and col == 7:
+            button8 = tk.Button(canvas, text="8 Kolona", command=lambda: drop_piece(7, label))
+            button8.place(x=col * 100 + 20, y=row * 100 + 65)
+        else:
+            cell = canvas.create_oval(col * 100 + 10, row * 100 + 10, col * 100 + 90, row * 100 + 90, fill="white")
+            cell_row.append(cell)
+    cells.append(cell_row)
+
+serverPort=12000
+serverName='147.91.8.139'
+clientSocket = socket(AF_INET, SOCK_DGRAM)
+label.config(text="Ti si na potezu!", font=("Arial", 30))
+
+root.mainloop()
